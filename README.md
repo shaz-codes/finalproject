@@ -20,6 +20,19 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## OAuth sign-in
+
+The app supports Google and GitHub OAuth through Auth.js, with users, linked accounts, and sessions persisted in PostgreSQL through Prisma. Copy `.env.example` to `.env`, create OAuth apps with each provider, and fill in the client IDs and secrets. Set the provider callback URLs to:
+
+- Google: `http://localhost:3000/api/auth/callback/google`
+- GitHub: `http://localhost:3000/api/auth/callback/github`
+
+Generate an `AUTH_SECRET` with `pnpm exec auth secret`. For production, use the deployed site's origin in each provider's callback URL and set `AUTH_TRUST_HOST=true` only when the deployment's host/proxy configuration is trusted.
+
+### PostgreSQL and Prisma
+
+Start the local PostgreSQL service with `docker compose up -d db`, then create and apply the initial migration with `pnpm db:migrate --name init`. Regenerate the Prisma client after schema changes with `pnpm db:generate`; use `pnpm db:studio` to inspect the database. Set `DATABASE_URL` in `.env` to your PostgreSQL connection string before running migrations.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
