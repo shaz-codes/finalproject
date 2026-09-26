@@ -4,11 +4,13 @@ import { FurniturePalette } from "./FurniturePalette";
 import { Room3DViewer } from "./Room3DViewer";
 import { RoomControls } from "./RoomControls";
 import { RoomEditor2D } from "./RoomEditor2D";
+import { SaveLoadPanel } from "./SaveLoadPanel";
 
 export function DesignWorkspace() {
 	return (
 		<div className="design-workspace">
 			<aside className="design-sidebar">
+				<SaveLoadPanel />
 				<RoomControls />
 				<FurniturePalette />
 			</aside>

@@ -13,6 +13,8 @@ const DEFAULT_ROOM: Room = {
 };
 
 interface DesignState {
+	designId: string | null;
+	designName: string;
 	room: Room;
 	placements: Placement[];
 	selectedId: string | null;
@@ -26,6 +28,15 @@ interface DesignState {
 	rotateFurniture: (id: string) => void;
 	removeFurniture: (id: string) => void;
 	selectFurniture: (id: string | null) => void;
+	setDesignName: (name: string) => void;
+	setSavedDesign: (id: string, name: string) => void;
+	loadDesign: (data: {
+		id: string;
+		name: string;
+		room: Room;
+		placements: Placement[];
+	}) => void;
+	resetDesign: () => void;
 }
 
 function clampToRoom(
@@ -47,6 +58,8 @@ function clampToRoom(
 let nextId = 1;
 
 export const useDesignStore = create<DesignState>((set) => ({
+	designId: null,
+	designName: "Untitled room",
 	room: DEFAULT_ROOM,
 	placements: [],
 	selectedId: null,
@@ -114,6 +127,22 @@ export const useDesignStore = create<DesignState>((set) => ({
 		})),
 
 	selectFurniture: (id) => set({ selectedId: id }),
+
+	setDesignName: (name) => set({ designName: name }),
+
+	setSavedDesign: (id, name) => set({ designId: id, designName: name }),
+
+	loadDesign: ({ id, name, room, placements }) =>
+		set({ designId: id, designName: name, room, placements, selectedId: null }),
+
+	resetDesign: () =>
+		set({
+			designId: null,
+			designName: "Untitled room",
+			room: DEFAULT_ROOM,
+			placements: [],
+			selectedId: null,
+		}),
 }));
 
 export function getRoomJson() {
