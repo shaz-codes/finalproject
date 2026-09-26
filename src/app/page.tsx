@@ -47,6 +47,9 @@ export default async function Home() {
 							<p className="eyebrow">SIGNED IN</p>
 							<h2>{session.user?.name ?? "Welcome back"}</h2>
 							<p className="panel-copy">{session.user?.email}</p>
+							<a className="oauth-button" href="/design">
+								Open room designer
+							</a>
 							<form
 								action={async () => {
 									"use server";
