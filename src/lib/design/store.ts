@@ -36,6 +36,7 @@ interface DesignState {
 		room: Room;
 		placements: Placement[];
 	}) => void;
+	applyPlacements: (placements: Placement[]) => void;
 	resetDesign: () => void;
 }
 
@@ -134,6 +135,8 @@ export const useDesignStore = create<DesignState>((set) => ({
 
 	loadDesign: ({ id, name, room, placements }) =>
 		set({ designId: id, designName: name, room, placements, selectedId: null }),
+
+	applyPlacements: (placements) => set({ placements, selectedId: null }),
 
 	resetDesign: () =>
 		set({
