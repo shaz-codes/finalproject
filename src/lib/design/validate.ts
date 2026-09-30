@@ -1,3 +1,4 @@
+import { MAX_SCALE, MIN_SCALE } from "./layout";
 import type { Opening, Placement, Room, Rotation } from "./types";
 import { isWallpaperId } from "./wallpapers";
 
@@ -47,8 +48,9 @@ function isPlacement(v: unknown): v is Placement {
 		isFiniteNumber(p.y) &&
 		typeof p.rot === "number" &&
 		ROTATIONS.has(p.rot as Rotation) &&
-		(p.z === undefined || isFiniteNumber(p.z)) &&
-		(p.scale === undefined || (isFiniteNumber(p.scale) && p.scale > 0))
+		(p.z === undefined || (isFiniteNumber(p.z) && p.z >= 0)) &&
+		(p.scale === undefined ||
+			(isFiniteNumber(p.scale) && p.scale >= MIN_SCALE && p.scale <= MAX_SCALE))
 	);
 }
 

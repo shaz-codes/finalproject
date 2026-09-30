@@ -158,10 +158,11 @@ export function carryItems(
 	riders: Placement[],
 ): Placement[] {
 	const turn = (after.rot - before.rot + 360) % 360;
+	const stretch = (after.scale ?? 1) / (before.scale ?? 1);
 	return riders.map((rider) => {
 		const { dx, dy } = rotateOffset(
-			rider.x - before.x,
-			rider.y - before.y,
+			(rider.x - before.x) * stretch,
+			(rider.y - before.y) * stretch,
 			turn,
 		);
 		return {

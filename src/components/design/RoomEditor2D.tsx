@@ -2,6 +2,7 @@
 
 import {
 	type PointerEvent as ReactPointerEvent,
+	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -23,6 +24,7 @@ const PAD = 14;
 const OPENING_THICKNESS = 10;
 const SCALE_STEP = 0.1;
 const HEIGHT_STEP = 0.05;
+const NUDGE_STEP = 0.05;
 // Space (px) the floating menu needs above an item before it flips below.
 const MENU_CLEARANCE = 64;
 const MENU_HALF_WIDTH = 170;
@@ -122,6 +124,48 @@ export function RoomEditor2D() {
 		observer.observe(container);
 		return () => observer.disconnect();
 	}, [selected, room]);
+
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (
+				!selectedId ||
+				event.ctrlKey ||
+				event.metaKey ||
+				event.altKey ||
+				target?.closest("input, textarea, select, [contenteditable]")
+			)
+				return;
+			const current = useDesignStore
+				.getState()
+				.placements.find((p) => p.id === selectedId);
+			if (!current) return;
+			const step = event.shiftKey ? NUDGE_STEP * 5 : NUDGE_STEP;
+			const nudge = {
+				ArrowLeft: [-step, 0],
+				ArrowRight: [step, 0],
+				ArrowUp: [0, -step],
+				ArrowDown: [0, step],
+			}[event.key];
+			if (nudge)
+				moveFurniture(selectedId, current.x + nudge[0], current.y + nudge[1]);
+			else if (event.key === "Delete" || event.key === "Backspace")
+				removeFurniture(selectedId);
+			else if (event.key === "r" || event.key === "R")
+				rotateFurniture(selectedId);
+			else if (event.key === "Escape") selectFurniture(null);
+			else return;
+			event.preventDefault();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [
+		selectedId,
+		moveFurniture,
+		removeFurniture,
+		rotateFurniture,
+		selectFurniture,
+	]);
 
 	const widthPx = room.width * PX_PER_M;
 	const lengthPx = room.length * PX_PER_M;
@@ -371,7 +415,12 @@ function ItemMenu({
 			role="toolbar"
 			aria-label={`${name} options`}
 		>
-			<span className="item-menu-name">{name}</span>
+			<span
+				className="item-menu-name"
+				title="Keys: arrows nudge (Shift = faster), R rotate, Delete remove, Esc deselect"
+			>
+				{name}
+			</span>
 			{canRotate && (
 				<button type="button" onClick={onRotate} title="Rotate 90°">
 					⟳
