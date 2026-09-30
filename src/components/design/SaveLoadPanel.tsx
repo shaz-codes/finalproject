@@ -81,7 +81,13 @@ export function SaveLoadPanel() {
 
 	return (
 		<div className="save-load-panel">
-			<h2>My Designs</h2>
+			<div className="catalog-heading">
+				<div>
+					<span className="section-kicker">Library</span>
+					<h2>My Designs</h2>
+				</div>
+				<span className="catalog-count">{designs.length} saved</span>
+			</div>
 			<label className="design-name-field">
 				Name
 				<input

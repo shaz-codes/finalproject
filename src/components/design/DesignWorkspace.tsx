@@ -14,6 +14,7 @@ import { WalkthroughViewer } from "./WalkthroughViewer";
 export function DesignWorkspace() {
 	const [showWalkthrough, setShowWalkthrough] = useState(false);
 	const room = useDesignStore((state) => state.room);
+	const placements = useDesignStore((state) => state.placements);
 
 	if (showWalkthrough) {
 		return (
@@ -70,11 +71,23 @@ export function DesignWorkspace() {
 					</button>
 				</div>
 				<div className="design-panel">
-					<h2>2D Plan</h2>
+					<div className="catalog-heading">
+						<div>
+							<span className="section-kicker">Top-down</span>
+							<h2>2D Plan</h2>
+						</div>
+						<span className="catalog-count">{placements.length} pieces</span>
+					</div>
 					<RoomEditor2D />
 				</div>
 				<div className="design-panel">
-					<h2>3D View</h2>
+					<div className="catalog-heading">
+						<div>
+							<span className="section-kicker">Explore</span>
+							<h2>3D View</h2>
+						</div>
+						<span className="catalog-count">Drag to orbit</span>
+					</div>
 					<Room3DViewer />
 				</div>
 			</section>

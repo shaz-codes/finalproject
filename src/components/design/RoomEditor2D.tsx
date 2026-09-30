@@ -10,6 +10,7 @@ import { useDesignStore } from "@/lib/design/store";
 import type { Opening } from "@/lib/design/types";
 
 const PX_PER_M = 70;
+const PAD = 14;
 
 function wallLine(wall: Opening["wall"], width: number, length: number) {
   switch (wall) {
@@ -42,49 +43,80 @@ export function RoomEditor2D() {
   const removeFurniture = useDesignStore((s) => s.removeFurniture);
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{
+    id: string;
+    dx: number;
+    dy: number;
+  } | null>(null);
 
   const widthPx = room.width * PX_PER_M;
   const lengthPx = room.length * PX_PER_M;
 
+  // Map screen coords into room meters, accounting for the viewBox scaling.
   function toRoomCoords(e: ReactPointerEvent) {
     const svg = svgRef.current;
-    if (!svg) return null;
-    const rect = svg.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / PX_PER_M;
-    const y = (e.clientY - rect.top) / PX_PER_M;
-    return { x, y };
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(
+      matrix.inverse(),
+    );
+    return { x: point.x / PX_PER_M, y: point.y / PX_PER_M };
   }
 
   function handlePointerMove(e: ReactPointerEvent) {
-    if (!dragId) return;
+    if (!drag) return;
     const coords = toRoomCoords(e);
     if (!coords) return;
-    moveFurniture(dragId, coords.x, coords.y);
+    moveFurniture(drag.id, coords.x - drag.dx, coords.y - drag.dy);
   }
 
   function handlePointerUp() {
-    setDragId(null);
+    setDrag(null);
   }
 
   return (
     <div className="editor-2d">
+      <span className="plan-compass" title="North is the top of the plan">
+        <span aria-hidden="true">↑</span> N
+      </span>
       <svg
         ref={svgRef}
-        width={widthPx}
-        height={lengthPx}
+        viewBox={`${-PAD} ${-PAD} ${widthPx + PAD * 2} ${lengthPx + PAD * 2}`}
+        preserveAspectRatio="xMidYMid meet"
         className="room-svg"
+        onPointerDown={() => selectFurniture(null)}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
         <title>2D room floor plan</title>
+        <defs>
+          <pattern
+            id="room-grid"
+            width={PX_PER_M / 2}
+            height={PX_PER_M / 2}
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d={`M ${PX_PER_M / 2} 0 L 0 0 0 ${PX_PER_M / 2}`}
+              className="room-grid-line"
+            />
+          </pattern>
+        </defs>
         <rect
           x={0}
           y={0}
           width={widthPx}
           height={lengthPx}
           className="room-floor"
+        />
+        <rect
+          x={0}
+          y={0}
+          width={widthPx}
+          height={lengthPx}
+          fill="url(#room-grid)"
+          pointerEvents="none"
         />
 
         {room.doors.map((d) => {
@@ -140,11 +172,20 @@ export function RoomEditor2D() {
               transform={`translate(${cx - w / 2}, ${cy - h / 2})`}
               onPointerDown={(e) => {
                 e.stopPropagation();
+                svgRef.current?.setPointerCapture(e.pointerId);
                 selectFurniture(p.id);
-                setDragId(p.id);
+                const coords = toRoomCoords(e);
+                setDrag({
+                  id: p.id,
+                  dx: coords ? coords.x - p.x : 0,
+                  dy: coords ? coords.y - p.y : 0,
+                });
               }}
-              className="furniture-item"
+              className={
+                drag?.id === p.id ? "furniture-item dragging" : "furniture-item"
+              }
             >
+              <title>{item.name}</title>
               <rect
                 width={w}
                 height={h}
@@ -154,7 +195,7 @@ export function RoomEditor2D() {
                 }
               />
               <text x={w / 2} y={h / 2} className="furniture-label">
-                {item.name}
+                {Math.min(w, h) >= 30 ? item.name : ""}
               </text>
             </g>
           );

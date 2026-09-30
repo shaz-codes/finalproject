@@ -1,5 +1,6 @@
 import { getCatalogItem } from "./catalog";
 import type { Placement, Room, Rotation, Wall } from "./types";
+import { vastuScore, type Zone } from "./vastu";
 
 export interface OptimizationWeights {
 	ergonomics: number;
@@ -55,13 +56,14 @@ function overlap(a: Placement, b: Placement, gap = 0) {
 	);
 }
 
+// y = 0 is the north wall (matches the 2D/3D views).
 function wallDistance(placement: Placement, wall: Wall, room: Room) {
 	const current = box(placement);
 	switch (wall) {
 		case "N":
-			return room.length - current.top;
-		case "S":
 			return current.bottom;
+		case "S":
+			return room.length - current.top;
 		case "E":
 			return room.width - current.right;
 		case "W":
@@ -75,7 +77,7 @@ function nearestDoorDistance(placement: Placement, room: Room) {
 			const x =
 				door.wall === "E" ? room.width : door.wall === "W" ? 0 : door.offset;
 			const y =
-				door.wall === "N" ? room.length : door.wall === "S" ? 0 : door.offset;
+				door.wall === "N" ? 0 : door.wall === "S" ? room.length : door.offset;
 			return Math.hypot(placement.x - x, placement.y - y);
 		}),
 		Math.hypot(room.width, room.length),
@@ -129,18 +131,7 @@ export function scoreLayout(
 		0,
 		1 - overlaps * 0.35 - blockedOpenings * 0.25 - circulationPenalty,
 	);
-	const vastu =
-		placements.reduce((value, placement) => {
-			const item = getCatalogItem(placement.catalogId);
-			const preferredWall: Wall = item.id.includes("bed")
-				? "S"
-				: item.id === "wardrobe"
-					? "W"
-					: "N";
-			return (
-				value + (wallDistance(placement, preferredWall, room) < 0.8 ? 1 : 0.5)
-			);
-		}, 0) / Math.max(placements.length, 1);
+	const vastu = vastuScore(room, placements);
 	const total =
 		(ergonomics * weights.ergonomics +
 			space * weights.space +
@@ -221,22 +212,35 @@ export function optimizeLayout(
 	return options.sort((a, b) => b.score.total - a.score.total).slice(0, limit);
 }
 
+const FALLBACK_ZONE: Record<string, Zone> = {
+	"bed-queen": "SW",
+	"bed-single": "SW",
+	wardrobe: "W",
+	bookshelf: "S",
+	"study-table": "NE",
+	sofa: "S",
+	"tv-unit": "SE",
+	"floor-lamp": "SE",
+	plant: "NE",
+	"dining-table": "W",
+};
+
+// Snap items against the walls of their Vastu-preferred zone.
 export function relationFallback(room: Room, placements: Placement[]) {
 	return placements.map((placement) => {
-		const item = getCatalogItem(placement.catalogId);
-		const preferredWall: Wall = item.id.includes("bed")
-			? "S"
-			: item.id === "wardrobe"
-				? "W"
-				: "N";
+		const zone = FALLBACK_ZONE[placement.catalogId];
+		if (!zone) return placement;
 		const { width, depth } = dimensions(placement);
-		const x = preferredWall === "W" ? width / 2 : room.width / 2;
-		const y =
-			preferredWall === "N"
+		const x = zone.includes("W")
+			? width / 2
+			: zone.includes("E")
+				? room.width - width / 2
+				: room.width / 2;
+		const y = zone.startsWith("N")
+			? depth / 2
+			: zone.startsWith("S")
 				? room.length - depth / 2
-				: preferredWall === "S"
-					? depth / 2
-					: room.length / 2;
+				: room.length / 2;
 		return { ...placement, x, y };
 	});
 }

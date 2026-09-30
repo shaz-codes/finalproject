@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
 	type LayoutOption,
 	type OptimizationWeights,
 	optimizeLayout,
 } from "@/lib/design/optimizer";
 import { useDesignStore } from "@/lib/design/store";
+import { vastuReport } from "@/lib/design/vastu";
 
 const DEFAULT_WEIGHTS: OptimizationWeights = {
 	ergonomics: 50,
@@ -22,6 +23,11 @@ export function OptimizerPanel() {
 	const room = useDesignStore((state) => state.room);
 	const placements = useDesignStore((state) => state.placements);
 	const applyPlacements = useDesignStore((state) => state.applyPlacements);
+	const selectFurniture = useDesignStore((state) => state.selectFurniture);
+	const vastu = useMemo(
+		() => vastuReport(room, placements),
+		[room, placements],
+	);
 	const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
 	const [options, setOptions] = useState<LayoutOption[]>([]);
 	const [selected, setSelected] = useState(0);
@@ -149,6 +155,33 @@ export function OptimizerPanel() {
 				</>
 			)}
 			{error && <p className="optimizer-error">{error}</p>}
+			{placements.length > 0 && (
+				<details className="vastu-report">
+					<summary>
+						<span>Vastu check</span>
+						<strong>{percent(vastu.score)}</strong>
+					</summary>
+					<p className="vastu-legend">
+						North is the top of the 2D plan. Click a tip to select the piece.
+					</p>
+					<ul>
+						{vastu.checks.map((check) => (
+							<li key={`${check.placementId ?? "room"}-${check.message}`}>
+								<button
+									type="button"
+									className={`vastu-check ${check.status}`}
+									disabled={!check.placementId}
+									onClick={() =>
+										check.placementId && selectFurniture(check.placementId)
+									}
+								>
+									{check.message}
+								</button>
+							</li>
+						))}
+					</ul>
+				</details>
+			)}
 		</div>
 	);
 }

@@ -1,4 +1,5 @@
 import type { Opening, Placement, Room, Rotation } from "./types";
+import { isWallpaperId } from "./wallpapers";
 
 const WALLS = new Set(["N", "S", "E", "W"]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
@@ -28,6 +29,7 @@ export function isRoom(v: unknown): v is Room {
 		isFiniteNumber(r.height) &&
 		(typeof r.wallColor === "undefined" || typeof r.wallColor === "string") &&
 		(typeof r.floorColor === "undefined" || typeof r.floorColor === "string") &&
+		(typeof r.wallpaper === "undefined" || isWallpaperId(r.wallpaper)) &&
 		Array.isArray(r.doors) &&
 		r.doors.every(isOpening) &&
 		Array.isArray(r.windows) &&

@@ -10,6 +10,7 @@ const DEFAULT_ROOM: Room = {
 	height: 2.7,
 	wallColor: "#e5e3da",
 	floorColor: "#d8cdbb",
+	wallpaper: "plain",
 	doors: [{ id: "door-1", wall: "S", offset: 1.5, width: 0.9 }],
 	windows: [{ id: "window-1", wall: "N", offset: 2, width: 1.2 }],
 };
@@ -22,7 +23,10 @@ interface DesignState {
 	selectedId: string | null;
 	setRoomSize: (
 		dims: Partial<
-			Pick<Room, "width" | "length" | "height" | "wallColor" | "floorColor">
+			Pick<
+				Room,
+				"width" | "length" | "height" | "wallColor" | "floorColor" | "wallpaper"
+			>
 		>,
 	) => void;
 	addOpening: (kind: "doors" | "windows", wall: Wall) => void;

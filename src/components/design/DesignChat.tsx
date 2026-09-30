@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LayoutOption } from "@/lib/design/optimizer";
 import { useDesignStore } from "@/lib/design/store";
 
@@ -19,8 +19,18 @@ export function DesignChat() {
 		},
 	]);
 	const [options, setOptions] = useState<LayoutOption[]>([]);
+	const [activeOption, setActiveOption] = useState(0);
 	const [status, setStatus] = useState<"idle" | "sending">("idle");
 	const [error, setError] = useState<string | null>(null);
+	const messagesRef = useRef<HTMLDivElement>(null);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the thread changes
+	useEffect(() => {
+		messagesRef.current?.scrollTo({
+			top: messagesRef.current.scrollHeight,
+			behavior: "smooth",
+		});
+	}, [messages, status]);
 
 	async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -34,7 +44,13 @@ export function DesignChat() {
 			const response = await fetch("/api/layout/chat", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ room, placements, message: request }),
+				body: JSON.stringify({
+					room,
+					placements,
+					message: request,
+					// Skip the canned greeting; the server caps history length.
+					history: messages.slice(1),
+				}),
 			});
 			const data = await response.json();
 			if (!response.ok)
@@ -44,7 +60,9 @@ export function DesignChat() {
 				{ role: "assistant", text: data.reply },
 			]);
 			if (data.room) applyRoom(data.room);
+			if (Array.isArray(data.placements)) applyPlacements(data.placements);
 			setOptions(data.options ?? []);
+			setActiveOption(0);
 		} catch (chatError) {
 			setError(
 				chatError instanceof Error
@@ -64,10 +82,10 @@ export function DesignChat() {
 					<p>Describe the room you want.</p>
 				</div>
 				<span className="chat-status">
-					{status === "sending" ? "Working" : "Ready"}
+					{status === "sending" ? "Thinking" : "Ready"}
 				</span>
 			</div>
-			<div className="chat-messages" aria-live="polite">
+			<div className="chat-messages" aria-live="polite" ref={messagesRef}>
 				{messages.map((item, index) => (
 					<p
 						key={`${item.role}-${index}`}
@@ -76,6 +94,14 @@ export function DesignChat() {
 						{item.text}
 					</p>
 				))}
+				{status === "sending" && (
+					<p className="chat-message assistant is-typing">
+						<span />
+						<span />
+						<span />
+						<span className="sr-only">Designing your room...</span>
+					</p>
+				)}
 			</div>
 			<form className="chat-form" onSubmit={sendMessage}>
 				<label htmlFor="design-request">Your requirements</label>
@@ -83,6 +109,12 @@ export function DesignChat() {
 					id="design-request"
 					value={message}
 					onChange={(event) => setMessage(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && !event.shiftKey) {
+							event.preventDefault();
+							event.currentTarget.form?.requestSubmit();
+						}
+					}}
 					placeholder="e.g. Add a bed and desk, keep the center open"
 					rows={3}
 					disabled={status === "sending"}
@@ -101,7 +133,12 @@ export function DesignChat() {
 						<button
 							type="button"
 							key={`${option.label}-${index}`}
-							onClick={() => applyPlacements(option.placements)}
+							className={index === activeOption ? "active" : undefined}
+							aria-pressed={index === activeOption}
+							onClick={() => {
+								applyPlacements(option.placements);
+								setActiveOption(index);
+							}}
 						>
 							<span>{option.label}</span>
 							<strong>{Math.round(option.score.total * 100)}%</strong>

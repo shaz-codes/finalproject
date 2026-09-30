@@ -1,22 +1,26 @@
 import type { FurnitureCatalogItem } from "./types";
 
-// Placeholder catalog — swap for real GLB-backed assets later (see PROGRESS.md).
+// 3D models: Kenney Furniture Kit (CC0) — see public/models/furniture/LICENSE-kenney.txt.
+const MODELS = "/models/furniture";
+
 export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 	{
 		id: "bed-queen",
 		name: "Queen Bed",
 		width: 1.6,
 		depth: 2.0,
-		height: 0.5,
+		height: 0.9,
 		color: "#8d6e63",
+		model: `${MODELS}/bedDouble.glb`,
 	},
 	{
 		id: "bed-single",
 		name: "Single Bed",
 		width: 1.0,
 		depth: 2.0,
-		height: 0.5,
+		height: 0.85,
 		color: "#a1887f",
+		model: `${MODELS}/bedSingle.glb`,
 	},
 	{
 		id: "wardrobe",
@@ -25,6 +29,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.6,
 		height: 2.0,
 		color: "#5d4037",
+		model: `${MODELS}/bookcaseClosedDoors.glb`,
 	},
 	{
 		id: "study-table",
@@ -33,6 +38,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.6,
 		height: 0.75,
 		color: "#795548",
+		model: `${MODELS}/desk.glb`,
 	},
 	{
 		id: "chair",
@@ -41,6 +47,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.5,
 		height: 0.9,
 		color: "#6d4c41",
+		model: `${MODELS}/chairDesk.glb`,
 	},
 	{
 		id: "sofa",
@@ -49,6 +56,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.85,
 		height: 0.8,
 		color: "#455a64",
+		model: `${MODELS}/loungeSofa.glb`,
 	},
 	{
 		id: "coffee-table",
@@ -57,6 +65,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.5,
 		height: 0.4,
 		color: "#4e342e",
+		model: `${MODELS}/tableCoffee.glb`,
 	},
 	{
 		id: "bookshelf",
@@ -65,6 +74,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.35,
 		height: 1.8,
 		color: "#3e2723",
+		model: `${MODELS}/bookcaseOpen.glb`,
 	},
 	{
 		id: "nightstand",
@@ -73,6 +83,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.45,
 		height: 0.55,
 		color: "#8d6e63",
+		model: `${MODELS}/cabinetBedDrawerTable.glb`,
 	},
 	{
 		id: "dining-table",
@@ -81,6 +92,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.9,
 		height: 0.75,
 		color: "#6d4c41",
+		model: `${MODELS}/table.glb`,
 	},
 	{
 		id: "dining-chair",
@@ -89,6 +101,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.5,
 		height: 0.9,
 		color: "#795548",
+		model: `${MODELS}/chair.glb`,
 	},
 	{
 		id: "tv-unit",
@@ -97,6 +110,7 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.4,
 		height: 0.55,
 		color: "#37474f",
+		model: `${MODELS}/cabinetTelevision.glb`,
 	},
 	{
 		id: "floor-lamp",
@@ -105,6 +119,8 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.35,
 		height: 1.7,
 		color: "#c49a52",
+		model: `${MODELS}/lampRoundFloor.glb`,
+		light: { color: "#ffd9a0", intensity: 3 },
 	},
 	{
 		id: "plant",
@@ -113,14 +129,16 @@ export const FURNITURE_CATALOG: FurnitureCatalogItem[] = [
 		depth: 0.45,
 		height: 1.2,
 		color: "#4f7942",
+		model: `${MODELS}/pottedPlant.glb`,
 	},
 	{
 		id: "rug",
 		name: "Area Rug",
 		width: 2.0,
 		depth: 1.4,
-		height: 0.04,
+		height: 0.02,
 		color: "#b98275",
+		model: `${MODELS}/rugRectangle.glb`,
 	},
 ];
 
