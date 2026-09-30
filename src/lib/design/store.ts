@@ -218,7 +218,10 @@ export const useDesignStore = create<DesignState>((set) => ({
 					return rest;
 				}
 				const maxZ = Math.max(0, state.room.height - dimsOf(p).height);
-				return { ...p, z: Math.round(Math.min(Math.max(z, 0), maxZ) * 100) / 100 };
+				return {
+					...p,
+					z: Math.round(Math.min(Math.max(z, 0), maxZ) * 100) / 100,
+				};
 			}),
 		})),
 

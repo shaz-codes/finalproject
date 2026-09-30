@@ -73,7 +73,8 @@ export function elevationOf(
 	const item = getCatalogItem(placement.catalogId);
 	const { height } = dimsOf(placement);
 	const maxZ = Math.max(0, room.height - height);
-	if (placement.z !== undefined) return Math.min(Math.max(placement.z, 0), maxZ);
+	if (placement.z !== undefined)
+		return Math.min(Math.max(placement.z, 0), maxZ);
 	const mount = item.mount ?? "floor";
 	if (mount === "ceiling") return maxZ;
 	if (mount === "wall")
@@ -105,13 +106,33 @@ export function snapToWall(room: Room, placement: Placement): Placement {
 		Math.min(Math.max(value, width / 2), span - width / 2);
 	switch (wall) {
 		case "N":
-			return { ...placement, x: along(placement.x, room.width), y: depth / 2, rot: WALL_ROTATION.N };
+			return {
+				...placement,
+				x: along(placement.x, room.width),
+				y: depth / 2,
+				rot: WALL_ROTATION.N,
+			};
 		case "S":
-			return { ...placement, x: along(placement.x, room.width), y: room.length - depth / 2, rot: WALL_ROTATION.S };
+			return {
+				...placement,
+				x: along(placement.x, room.width),
+				y: room.length - depth / 2,
+				rot: WALL_ROTATION.S,
+			};
 		case "W":
-			return { ...placement, x: depth / 2, y: along(placement.y, room.length), rot: WALL_ROTATION.W };
+			return {
+				...placement,
+				x: depth / 2,
+				y: along(placement.y, room.length),
+				rot: WALL_ROTATION.W,
+			};
 		case "E":
-			return { ...placement, x: room.width - depth / 2, y: along(placement.y, room.length), rot: WALL_ROTATION.E };
+			return {
+				...placement,
+				x: room.width - depth / 2,
+				y: along(placement.y, room.length),
+				rot: WALL_ROTATION.E,
+			};
 	}
 }
 
