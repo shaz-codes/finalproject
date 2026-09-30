@@ -2,9 +2,11 @@
 
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
+import { elevationOf } from "@/lib/design/layout";
 import { useDesignStore } from "@/lib/design/store";
 import type { Room } from "@/lib/design/types";
 import { FurnitureModel } from "./FurnitureModel";
+import { RoomOpenings } from "./RoomOpenings";
 import { WallMaterial } from "./WallMaterial";
 
 // Inward-facing planes: walls nearest the orbit camera are back-face culled (dollhouse view).
@@ -45,6 +47,7 @@ function Walls({ room }: { room: Room }) {
 					<WallMaterial room={room} span={wall.span} />
 				</mesh>
 			))}
+			<RoomOpenings room={room} inset={0} />
 		</group>
 	);
 }
@@ -79,6 +82,7 @@ export function Room3DViewer() {
 						key={p.id}
 						placement={p}
 						room={room}
+						elevation={elevationOf(p, placements, room)}
 						selected={p.id === selectedId}
 						onSelect={(e) => {
 							e.stopPropagation();

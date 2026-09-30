@@ -33,6 +33,7 @@ export function OptimizerPanel() {
 	const [selected, setSelected] = useState(0);
 	const [status, setStatus] = useState<"idle" | "asking" | "error">("idle");
 	const [error, setError] = useState<string | null>(null);
+	const [note, setNote] = useState<string | null>(null);
 
 	function updateWeight(key: keyof OptimizationWeights, value: number) {
 		setWeights((current) => ({ ...current, [key]: value }));
@@ -40,6 +41,7 @@ export function OptimizerPanel() {
 
 	function handleOptimize() {
 		setError(null);
+		setNote(null);
 		setOptions(optimizeLayout(room, placements, weights));
 		setSelected(0);
 	}
@@ -47,6 +49,7 @@ export function OptimizerPanel() {
 	async function handleSuggest() {
 		setStatus("asking");
 		setError(null);
+		setNote(null);
 		try {
 			const response = await fetch("/api/layout/optimize", {
 				method: "POST",
@@ -58,6 +61,11 @@ export function OptimizerPanel() {
 				throw new Error(data.error ?? "Unable to suggest a layout");
 			setOptions(data.options);
 			setSelected(0);
+			setNote(
+				data.source === "llm"
+					? (data.reply ?? null)
+					: "The AI is unavailable, so these are offline Vastu-guided suggestions.",
+			);
 		} catch (suggestionError) {
 			setError(
 				suggestionError instanceof Error
@@ -154,6 +162,7 @@ export function OptimizerPanel() {
 					)}
 				</>
 			)}
+			{note && <p className="optimizer-note">{note}</p>}
 			{error && <p className="optimizer-error">{error}</p>}
 			{placements.length > 0 && (
 				<details className="vastu-report">

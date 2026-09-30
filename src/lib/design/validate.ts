@@ -46,7 +46,9 @@ function isPlacement(v: unknown): v is Placement {
 		isFiniteNumber(p.x) &&
 		isFiniteNumber(p.y) &&
 		typeof p.rot === "number" &&
-		ROTATIONS.has(p.rot as Rotation)
+		ROTATIONS.has(p.rot as Rotation) &&
+		(p.z === undefined || isFiniteNumber(p.z)) &&
+		(p.scale === undefined || (isFiniteNumber(p.scale) && p.scale > 0))
 	);
 }
 

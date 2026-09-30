@@ -3,32 +3,37 @@
 import { useMemo, useState } from "react";
 import { FURNITURE_CATALOG } from "@/lib/design/catalog";
 import { useDesignStore } from "@/lib/design/store";
+import type { FurnitureCatalogItem } from "@/lib/design/types";
 
-function categoryFor(id: string) {
-	return id.includes("bed")
-		? "Sleep"
-		: id.includes("table") || id === "chair"
-			? "Work"
-			: id === "sofa" || id === "coffee-table"
-				? "Lounge"
-				: "Storage";
-}
+const CATEGORIES = [
+	"All",
+	...new Set(FURNITURE_CATALOG.map((item) => item.category)),
+];
+const STYLES: Array<{
+	id: "all" | FurnitureCatalogItem["style"];
+	label: string;
+}> = [
+	{ id: "all", label: "Any style" },
+	{ id: "stylized", label: "Cartoon" },
+	{ id: "realistic", label: "Realistic" },
+];
 
 export function FurniturePalette() {
 	const addFurniture = useDesignStore((s) => s.addFurniture);
 	const placements = useDesignStore((s) => s.placements);
 	const [query, setQuery] = useState("");
 	const [category, setCategory] = useState("All");
+	const [style, setStyle] = useState<(typeof STYLES)[number]["id"]>("all");
 
-	const categories = ["All", "Sleep", "Work", "Lounge", "Storage"];
 	const filteredItems = useMemo(
 		() =>
 			FURNITURE_CATALOG.filter(
 				(item) =>
 					item.name.toLowerCase().includes(query.toLowerCase()) &&
-					(category === "All" || categoryFor(item.id) === category),
+					(category === "All" || item.category === category) &&
+					(style === "all" || item.style === style),
 			),
-		[category, query],
+		[category, query, style],
 	);
 
 	return (
@@ -50,7 +55,7 @@ export function FurniturePalette() {
 				<span aria-hidden="true">/</span>
 			</label>
 			<nav className="catalog-filters" aria-label="Furniture categories">
-				{categories.map((item) => (
+				{CATEGORIES.map((item) => (
 					<button
 						type="button"
 						key={item}
@@ -61,6 +66,21 @@ export function FurniturePalette() {
 					</button>
 				))}
 			</nav>
+			<nav className="catalog-filters" aria-label="Model style">
+				{STYLES.map((item) => (
+					<button
+						type="button"
+						key={item.id}
+						className={style === item.id ? "active" : ""}
+						onClick={() => setStyle(item.id)}
+					>
+						{item.label}
+					</button>
+				))}
+			</nav>
+			<p className="catalog-hint">
+				Select a table or desk first to drop small items onto it.
+			</p>
 			<div className="furniture-grid">
 				{filteredItems.map((item) => (
 					<button
@@ -74,6 +94,9 @@ export function FurniturePalette() {
 							style={{ "--piece-color": item.color } as React.CSSProperties}
 						>
 							<span className="furniture-preview-shape" aria-hidden="true" />
+							{item.style === "realistic" && (
+								<span className="style-badge">Real</span>
+							)}
 							<span className="add-symbol" aria-hidden="true">
 								+
 							</span>

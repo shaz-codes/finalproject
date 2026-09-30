@@ -1,4 +1,5 @@
 import { getCatalogItem } from "./catalog";
+import { dimsOf, footprint, occupiesFloor } from "./layout";
 import type { Placement, Room, Rotation } from "./types";
 
 // Plan orientation (matches the 2D/3D views): y = 0 is the north wall, x = 0 the west wall.
@@ -98,6 +99,29 @@ const RULES: Record<string, VastuRule> = {
 	},
 };
 
+// Items that follow another item's rule.
+const RULE_ALIASES: Record<string, string> = {
+	"bunk-bed": "bed-queen",
+	"drawer-cabinet": "wardrobe",
+	"sofa-fabric": "sofa",
+	"sofa-grand": "sofa",
+	"corner-sofa": "sofa",
+	armchair: "sofa",
+	"lounge-chair": "sofa",
+	"tv-flat": "tv-unit",
+	"tv-vintage": "tv-unit",
+	"tv-retro": "tv-unit",
+	speaker: "tv-unit",
+	"floor-lamp-square": "floor-lamp",
+	"plant-small": "plant",
+	"plant-potted": "plant",
+	"round-table": "dining-table",
+};
+
+function ruleFor(catalogId: string): VastuRule | undefined {
+	return RULES[catalogId] ?? RULES[RULE_ALIASES[catalogId]];
+}
+
 const ZONE_NAMES: Record<Zone, string> = {
 	NW: "north-west",
 	N: "north",
@@ -144,13 +168,10 @@ function listNames(
 }
 
 function coversCentre(room: Room, placement: Placement) {
-	const item = getCatalogItem(placement.catalogId);
-	const rotated = placement.rot === 90 || placement.rot === 270;
-	const halfW = (rotated ? item.depth : item.width) / 2;
-	const halfD = (rotated ? item.width : item.depth) / 2;
+	const { width, depth } = footprint(placement);
 	return (
-		Math.abs(placement.x - room.width / 2) < halfW &&
-		Math.abs(placement.y - room.length / 2) < halfD
+		Math.abs(placement.x - room.width / 2) < width / 2 &&
+		Math.abs(placement.y - room.length / 2) < depth / 2
 	);
 }
 
@@ -161,9 +182,9 @@ function evaluate(room: Room, placements: Placement[], checks?: VastuCheck[]) {
 	let centreBlocked = false;
 	for (const placement of placements) {
 		const item = getCatalogItem(placement.catalogId);
-		const rule = RULES[item.id];
+		const rule = ruleFor(item.id);
 		const zone = zoneOf(room, placement.x, placement.y);
-		const heavy = item.height >= 0.7;
+		const heavy = occupiesFloor(placement) && dimsOf(placement).height >= 0.7;
 		let score: number | null = null;
 
 		if (rule) {

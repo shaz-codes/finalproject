@@ -1,4 +1,11 @@
 import { getCatalogItem } from "./catalog";
+import {
+	carryItems,
+	footprint as dimensions,
+	itemsOn,
+	mountOf,
+	occupiesFloor,
+} from "./layout";
 import type { Placement, Room, Rotation, Wall } from "./types";
 import { vastuScore, type Zone } from "./vastu";
 
@@ -25,15 +32,6 @@ export interface LayoutOption {
 
 const GRID = 0.1;
 const CLEARANCE = 0.75;
-
-function dimensions(placement: Placement) {
-	const item = getCatalogItem(placement.catalogId);
-	const rotated = placement.rot === 90 || placement.rot === 270;
-	return {
-		width: rotated ? item.depth : item.width,
-		depth: rotated ? item.width : item.depth,
-	};
-}
 
 function box(placement: Placement) {
 	const { width, depth } = dimensions(placement);
@@ -92,8 +90,7 @@ export function scoreLayout(
 	let overlaps = 0;
 	let blockedOpenings = 0;
 	let circulationPenalty = 0;
-	for (let index = 0; index < placements.length; index += 1) {
-		const placement = placements[index];
+	for (const placement of placements) {
 		const current = box(placement);
 		if (
 			current.left < 0 ||
@@ -102,12 +99,16 @@ export function scoreLayout(
 			current.top > room.length
 		)
 			overlaps += 2;
+	}
+	const solid = placements.filter(occupiesFloor);
+	for (let index = 0; index < solid.length; index += 1) {
+		const placement = solid[index];
 		for (
 			let otherIndex = index + 1;
-			otherIndex < placements.length;
+			otherIndex < solid.length;
 			otherIndex += 1
 		) {
-			if (overlap(placement, placements[otherIndex])) overlaps += 1;
+			if (overlap(placement, solid[otherIndex])) overlaps += 1;
 		}
 		for (const opening of room.doors) {
 			const nearOpening =
@@ -158,23 +159,45 @@ function candidatePositions(
 	return candidates;
 }
 
+// Re-seat tabletop items on their supports after the supports moved.
+export function reattachRiders(
+	original: Placement[],
+	moved: Placement[],
+): Placement[] {
+	const movedById = new Map(
+		moved.map((placement) => [placement.id, placement]),
+	);
+	const carried = new Map<string, Placement>();
+	for (const support of original) {
+		if (!getCatalogItem(support.catalogId).supports) continue;
+		const after = movedById.get(support.id);
+		if (!after) continue;
+		for (const rider of carryItems(support, after, itemsOn(support, original)))
+			carried.set(rider.id, rider);
+	}
+	return moved.map((placement) => carried.get(placement.id) ?? placement);
+}
+
 export function optimizeLayout(
 	room: Room,
 	placements: Placement[],
 	weights: OptimizationWeights,
 	limit = 3,
 ): LayoutOption[] {
-	if (placements.length === 0)
+	const movable = placements.filter(
+		(placement) => mountOf(placement) === "floor",
+	);
+	if (movable.length === 0)
 		return [
 			{
-				placements: [],
-				score: scoreLayout(room, [], weights),
+				placements,
+				score: scoreLayout(room, placements, weights),
 				label: "Current layout",
 			},
 		];
-	const seeds = [placements, [...placements].reverse()];
+	const seeds = [movable, [...movable].reverse()];
 	const options = seeds.map((seed, seedIndex) => {
-		let result = seed.map((placement) => ({ ...placement }));
+		let result = placements.map((placement) => ({ ...placement }));
 		for (const target of seed) {
 			const current = result.find((placement) => placement.id === target.id);
 			if (!current) continue;
@@ -198,6 +221,7 @@ export function optimizeLayout(
 				placement.id === current.id ? best : placement,
 			);
 		}
+		result = reattachRiders(placements, result);
 		return {
 			placements: result,
 			score: scoreLayout(room, result, weights),
@@ -215,19 +239,25 @@ export function optimizeLayout(
 const FALLBACK_ZONE: Record<string, Zone> = {
 	"bed-queen": "SW",
 	"bed-single": "SW",
+	"bunk-bed": "SW",
 	wardrobe: "W",
+	"drawer-cabinet": "W",
 	bookshelf: "S",
 	"study-table": "NE",
 	sofa: "S",
+	"sofa-fabric": "S",
+	"sofa-grand": "S",
+	armchair: "W",
 	"tv-unit": "SE",
 	"floor-lamp": "SE",
+	"floor-lamp-square": "SE",
 	plant: "NE",
 	"dining-table": "W",
 };
 
 // Snap items against the walls of their Vastu-preferred zone.
 export function relationFallback(room: Room, placements: Placement[]) {
-	return placements.map((placement) => {
+	const moved = placements.map((placement) => {
 		const zone = FALLBACK_ZONE[placement.catalogId];
 		if (!zone) return placement;
 		const { width, depth } = dimensions(placement);
@@ -243,4 +273,5 @@ export function relationFallback(room: Room, placements: Placement[]) {
 				: room.length / 2;
 		return { ...placement, x, y };
 	});
+	return reattachRiders(placements, moved);
 }

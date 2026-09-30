@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { FURNITURE_CATALOG, getCatalogItem } from "@/lib/design/catalog";
 import {
+	footprint,
+	MAX_SCALE,
+	MIN_SCALE,
+	mountOf,
+	snapToWall,
+} from "@/lib/design/layout";
+import {
 	type LayoutOption,
 	type OptimizationWeights,
 	optimizeLayout,
@@ -14,6 +21,7 @@ import {
 	WALLPAPERS,
 	type WallpaperId,
 } from "@/lib/design/wallpapers";
+import { requestJson } from "@/lib/llm";
 import { auth } from "../../../../../auth";
 
 const DEFAULT_WEIGHTS: OptimizationWeights = {
@@ -35,9 +43,13 @@ const CATALOG_ALIASES: Record<string, string[]> = {
 	"dining-table": ["dining table", "dinner table"],
 	"dining-chair": ["dining chair"],
 	"tv-unit": ["tv unit", "television unit", "tv stand"],
+	"tv-flat": ["flat tv", "tv", "television"],
 	"floor-lamp": ["floor lamp", "lamp"],
 	plant: ["plant", "indoor plant"],
 	rug: ["rug", "carpet"],
+	mug: ["mug", "cup"],
+	"coat-rack": ["coat rack", "coat stand"],
+	fridge: ["fridge", "refrigerator"],
 };
 
 const COLORS: Record<string, string> = {
@@ -156,17 +168,6 @@ function sanitizeHistory(value: unknown): ChatTurn[] {
 		.map(({ role, text }) => ({ role, text: text.slice(0, MAX_TURN_LENGTH) }));
 }
 
-function chatCompletionsUrl() {
-	const base = (process.env.OPENAI_API_URL ?? "https://api.openai.com").replace(
-		/\/+$/,
-		"",
-	);
-	if (base.endsWith("/chat/completions")) return base;
-	return /\/v\d+$/.test(base)
-		? `${base}/chat/completions`
-		: `${base}/v1/chat/completions`;
-}
-
 function clampRoom(room: Room): Room {
 	const clamp = (value: number, min: number, max: number) =>
 		Math.max(min, Math.min(max, Number(value.toFixed(2))));
@@ -197,11 +198,22 @@ function hexOr(value: unknown, fallback: string) {
 		: fallback;
 }
 
+// Optional per-item overrides the model may set; invalid values are dropped.
+function sizeAndHeight(source: Record<string, unknown>, base: Placement) {
+	const next: Pick<Placement, "z" | "scale"> = {};
+	const z = finiteOr(source.z, base.z ?? Number.NaN);
+	if (Number.isFinite(z)) next.z = Math.max(0, z);
+	const scale = finiteOr(source.scale, base.scale ?? Number.NaN);
+	if (Number.isFinite(scale))
+		next.scale = Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
+	return next;
+}
+
 function clampPlacement(room: Room, placement: Placement): Placement {
-	const item = getCatalogItem(placement.catalogId);
-	const rotated = placement.rot === 90 || placement.rot === 270;
-	const halfW = (rotated ? item.depth : item.width) / 2;
-	const halfD = (rotated ? item.width : item.depth) / 2;
+	if (mountOf(placement) === "wall") return snapToWall(room, placement);
+	const { width, depth } = footprint(placement);
+	const halfW = width / 2;
+	const halfD = depth / 2;
 	const clamp = (value: number, min: number, max: number) =>
 		Number(Math.min(Math.max(value, min), Math.max(min, max)).toFixed(2));
 	return {
@@ -251,6 +263,7 @@ function applyModelChanges(
 				x: finiteOr(update.x, placement.x),
 				y: finiteOr(update.y, placement.y),
 				rot: toRotation(update.rot, placement.rot),
+				...sizeAndHeight(update, placement),
 			};
 		});
 
@@ -261,13 +274,16 @@ function applyModelChanges(
 				isRecord(entry) &&
 				FURNITURE_CATALOG.some((item) => item.id === entry.catalogId),
 		)
-		.map((entry, index) => ({
-			id: `chat-item-${stamp}-${index}`,
-			catalogId: entry.catalogId as string,
-			x: finiteOr(entry.x, nextRoom.width / 2),
-			y: finiteOr(entry.y, nextRoom.length / 2),
-			rot: toRotation(entry.rot, 0),
-		}));
+		.map((entry, index) => {
+			const placement: Placement = {
+				id: `chat-item-${stamp}-${index}`,
+				catalogId: entry.catalogId as string,
+				x: finiteOr(entry.x, nextRoom.width / 2),
+				y: finiteOr(entry.y, nextRoom.length / 2),
+				rot: toRotation(entry.rot, 0),
+			};
+			return { ...placement, ...sizeAndHeight(entry, placement) };
+		});
 
 	return {
 		room: nextRoom,
@@ -313,13 +329,26 @@ function weightsFromText(text: string): OptimizationWeights {
 	};
 }
 
+// Longest aliases first, consuming matches, so "desk lamp" isn't also read as "desk" + "lamp".
+const ALIAS_INDEX = FURNITURE_CATALOG.flatMap((item) =>
+	[...(CATALOG_ALIASES[item.id] ?? []), item.name.toLowerCase()].map(
+		(alias) => [alias, item.id] as const,
+	),
+).sort((a, b) => b[0].length - a[0].length);
+
 function extractCatalogIds(text: string) {
-	const lower = text.toLowerCase();
-	return FURNITURE_CATALOG.filter((item) =>
-		(CATALOG_ALIASES[item.id] ?? [item.name.toLowerCase()]).some((alias) =>
-			lower.includes(alias),
-		),
-	).map((item) => item.id);
+	let remaining = ` ${text.toLowerCase()} `;
+	const ids: string[] = [];
+	for (const [alias, id] of ALIAS_INDEX) {
+		const pattern = new RegExp(
+			`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`,
+			"g",
+		);
+		if (!pattern.test(remaining)) continue;
+		if (!ids.includes(id)) ids.push(id);
+		remaining = remaining.replace(pattern, " ");
+	}
+	return ids;
 }
 
 function addRequestedFurniture(
@@ -329,11 +358,20 @@ function addRequestedFurniture(
 ) {
 	const additions = requested.map((catalogId, index) => {
 		const item = getCatalogItem(catalogId);
+		// Tabletop items go onto the first table/desk/cabinet in the room.
+		const support =
+			item.mount === "surface"
+				? placements.find((p) => getCatalogItem(p.catalogId).supports)
+				: undefined;
 		return {
 			id: `chat-item-${Date.now()}-${index}`,
 			catalogId,
-			x: Math.min(room.width - item.width / 2, room.width / 2 + index * 0.2),
-			y: Math.min(room.length - item.depth / 2, room.length / 2 + index * 0.2),
+			x:
+				support?.x ??
+				Math.min(room.width - item.width / 2, room.width / 2 + index * 0.2),
+			y:
+				support?.y ??
+				Math.min(room.length - item.depth / 2, room.length / 2 + index * 0.2),
 			rot: 0 as const,
 		};
 	});
@@ -384,10 +422,12 @@ function localConversation(
 const SYSTEM_PROMPT = [
 	"You are a friendly interior design assistant in an ongoing conversation. Earlier messages are the chat history; the last user message holds the CURRENT room state and the new request. Use the history to resolve references like 'it', 'that sofa', or 'undo'.",
 	"Respond with ONE compact JSON object containing ONLY what changes. Omit every key that has no change. Never repeat unchanged items or room fields.",
-	'Shape: {"reply": string, "room"?: {"width"?, "length"?, "height"? (meters), "wallColor"?, "floorColor"? ("#rrggbb"), "wallpaper"?}, "add"?: [{"catalogId", "x", "y", "rot"}], "update"?: [{"id", "x"?, "y"?, "rot"?}], "remove"?: ["id"], "weights"?: {"ergonomics", "space", "vastu"} (0-100, only when the user states priorities)}',
+	'Shape: {"reply": string, "room"?: {"width"?, "length"?, "height"? (meters), "wallColor"?, "floorColor"? ("#rrggbb"), "wallpaper"?}, "add"?: [{"catalogId", "x", "y", "rot", "z"?, "scale"?}], "update"?: [{"id", "x"?, "y"?, "rot"?, "z"?, "scale"?}], "remove"?: ["id"], "weights"?: {"ergonomics", "space", "vastu"} (0-100, only when the user states priorities)}',
+	"Optional z is the item's base height above the floor in meters (overrides automatic placement; use only when asked to raise/lower something). Optional scale (0.5-2) resizes an item uniformly.",
 	`wallpaper is one of ${WALLPAPERS.map(({ id }) => id).join("|")}; it is a pattern tinted by wallColor.`,
 	"Coordinates: x,y are the item's center in meters; x from the W wall (0..width), y from the N wall (0..length). rot is 0|90|180|270. Door/window offset is measured along its wall from the x=0 or y=0 end.",
 	"Orientation: an item's front (where you sit, the open side) faces S at rot 0, E at 90, N at 180, W at 270. A bed's head is opposite its front; at a desk you face opposite its front.",
+	"Catalog tags: 'surface' items (mugs, lamps, TVs, laptops...) rest on top of a 'supports' item when their x,y lies inside its footprint, so place them on a table/desk/cabinet; 'wall' items (picture frames, trophies) snap flat against the nearest wall at eye level; 'ceiling' items hang from the ceiling.",
 	"Use only catalog ids. Keep doors clear and avoid overlaps. If the request is just a question, answer it in reply with no other keys.",
 	"reply: at most 2 short sentences. Think briefly.",
 ].join("\n");
@@ -396,15 +436,24 @@ function describeState(room: Room, placements: Placement[]) {
 	const round = (value: number) => Math.round(value * 100) / 100;
 	return JSON.stringify({
 		room,
-		items: placements.map(({ id, catalogId, x, y, rot }) => ({
+		items: placements.map(({ id, catalogId, x, y, rot, z, scale }) => ({
 			id,
 			catalogId,
 			x: round(x),
 			y: round(y),
 			rot,
+			...(z !== undefined ? { z } : {}),
+			...(scale !== undefined && scale !== 1 ? { scale } : {}),
 		})),
-		catalog: FURNITURE_CATALOG.map(
-			({ id, width, depth }) => `${id} ${width}x${depth}`,
+		catalog: FURNITURE_CATALOG.map(({ id, width, depth, mount, supports }) =>
+			[
+				id,
+				`${width}x${depth}`,
+				mount && mount !== "floor" ? mount : "",
+				supports ? "supports" : "",
+			]
+				.filter(Boolean)
+				.join(" "),
 		),
 	});
 }
@@ -415,58 +464,25 @@ async function askModel(
 	message: string,
 	history: ChatTurn[],
 ) {
-	const apiKey = process.env.OPENAI_API_KEY;
-	if (!apiKey) return null;
-	// Reasoning models can take 20-50s; one deadline covers the retry too.
-	const signal = AbortSignal.timeout(90000);
-	const reasoningEffort = process.env.OPENAI_REASONING_EFFORT;
-	for (let attempt = 0; attempt < 2; attempt += 1) {
-		const response = await fetch(chatCompletionsUrl(), {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
+	return requestJson(
+		(attempt) => [
+			{ role: "system", content: SYSTEM_PROMPT },
+			...history.map(({ role, text }) => ({ role, content: text })),
+			{
+				role: "user",
+				content: [
+					`Current state: ${describeState(room, placements)}`,
+					`Request: ${message}`,
+					attempt > 0
+						? "Your previous answer was not valid. Follow the JSON shape exactly."
+						: "",
+				]
+					.filter(Boolean)
+					.join("\n"),
 			},
-			body: JSON.stringify({
-				model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-				temperature: 0.3,
-				response_format: { type: "json_object" },
-				...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-				messages: [
-					{ role: "system", content: SYSTEM_PROMPT },
-					...history.map(({ role, text }) => ({ role, content: text })),
-					{
-						role: "user",
-						content: [
-							`Current state: ${describeState(room, placements)}`,
-							`Request: ${message}`,
-							attempt > 0
-								? "Your previous answer was not valid. Follow the JSON shape exactly."
-								: "",
-						]
-							.filter(Boolean)
-							.join("\n"),
-					},
-				],
-			}),
-			signal,
-		});
-		if (!response.ok) {
-			console.error(
-				`Design chat LLM request failed (${response.status}):`,
-				(await response.text().catch(() => "")).slice(0, 300),
-			);
-			continue;
-		}
-		const body = await response.json();
-		try {
-			const parsed: unknown = JSON.parse(
-				body.choices?.[0]?.message?.content ?? "{}",
-			);
-			if (!isRecord(parsed) || typeof parsed.reply !== "string") {
-				console.error("Design chat LLM returned an unexpected shape");
-				continue;
-			}
+		],
+		(parsed) => {
+			if (!isRecord(parsed) || typeof parsed.reply !== "string") return null;
 			const next = applyModelChanges(room, placements, parsed);
 			const weights = normalizeWeights(parsed.weights);
 			// Keep the assistant's own layout first; optimizer results are alternatives.
@@ -487,11 +503,8 @@ async function askModel(
 				options,
 				source: "llm" as const,
 			};
-		} catch {
-			console.error("Design chat LLM returned invalid JSON");
-		}
-	}
-	return null;
+		},
+	);
 }
 
 export async function POST(request: Request) {

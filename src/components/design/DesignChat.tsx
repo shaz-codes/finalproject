@@ -1,27 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { LayoutOption } from "@/lib/design/optimizer";
+import { useEffect, useRef } from "react";
+import { useChatStore } from "@/lib/design/chatStore";
 import { useDesignStore } from "@/lib/design/store";
-
-type Message = { role: "assistant" | "user"; text: string };
 
 export function DesignChat() {
 	const room = useDesignStore((state) => state.room);
 	const placements = useDesignStore((state) => state.placements);
 	const applyPlacements = useDesignStore((state) => state.applyPlacements);
 	const applyRoom = useDesignStore((state) => state.applyRoom);
-	const [message, setMessage] = useState("");
-	const [messages, setMessages] = useState<Message[]>([
-		{
-			role: "assistant",
-			text: "Tell me what you need in this room. For example: add a sofa and coffee table, keep a clear walkway, or prioritize Vastu.",
-		},
-	]);
-	const [options, setOptions] = useState<LayoutOption[]>([]);
-	const [activeOption, setActiveOption] = useState(0);
-	const [status, setStatus] = useState<"idle" | "sending">("idle");
-	const [error, setError] = useState<string | null>(null);
+	const messages = useChatStore((state) => state.messages);
+	const message = useChatStore((state) => state.draft);
+	const options = useChatStore((state) => state.options);
+	const activeOption = useChatStore((state) => state.activeOption);
+	const status = useChatStore((state) => state.status);
+	const error = useChatStore((state) => state.error);
+	const addMessage = useChatStore((state) => state.addMessage);
+	const update = useChatStore((state) => state.update);
+	const setMessage = (draft: string) => update({ draft });
+	const setActiveOption = (activeOption: number) => update({ activeOption });
 	const messagesRef = useRef<HTMLDivElement>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the thread changes
@@ -36,10 +33,8 @@ export function DesignChat() {
 		event.preventDefault();
 		const request = message.trim();
 		if (!request || status === "sending") return;
-		setMessage("");
-		setError(null);
-		setStatus("sending");
-		setMessages((current) => [...current, { role: "user", text: request }]);
+		update({ draft: "", error: null, status: "sending" });
+		addMessage({ role: "user", text: request });
 		try {
 			const response = await fetch("/api/layout/chat", {
 				method: "POST",
@@ -55,22 +50,19 @@ export function DesignChat() {
 			const data = await response.json();
 			if (!response.ok)
 				throw new Error(data.error ?? "The design assistant could not respond");
-			setMessages((current) => [
-				...current,
-				{ role: "assistant", text: data.reply },
-			]);
+			addMessage({ role: "assistant", text: data.reply });
 			if (data.room) applyRoom(data.room);
 			if (Array.isArray(data.placements)) applyPlacements(data.placements);
-			setOptions(data.options ?? []);
-			setActiveOption(0);
+			update({ options: data.options ?? [], activeOption: 0 });
 		} catch (chatError) {
-			setError(
-				chatError instanceof Error
-					? chatError.message
-					: "The design assistant could not respond",
-			);
+			update({
+				error:
+					chatError instanceof Error
+						? chatError.message
+						: "The design assistant could not respond",
+			});
 		} finally {
-			setStatus("idle");
+			update({ status: "idle" });
 		}
 	}
 

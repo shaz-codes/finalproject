@@ -10,10 +10,11 @@ import {
   useState,
 } from "react";
 import { Euler, Vector3 } from "three";
-import { getCatalogItem } from "@/lib/design/catalog";
+import { elevationOf, footprint, occupiesFloor } from "@/lib/design/layout";
 import { useDesignStore } from "@/lib/design/store";
-import type { Opening, Placement, Room } from "@/lib/design/types";
+import type { Placement, Room } from "@/lib/design/types";
 import { FurnitureModel } from "./FurnitureModel";
+import { RoomOpenings } from "./RoomOpenings";
 import { WallMaterial } from "./WallMaterial";
 
 const EYE_HEIGHT = 1.6;
@@ -42,12 +43,9 @@ function isBlocked(x: number, z: number, room: Room, placements: Placement[]) {
   )
     return true;
   return placements.some((placement) => {
-    const item = getCatalogItem(placement.catalogId);
-    // Flat items like rugs can be walked over.
-    if (item.height < 0.1) return false;
-    const rotated = placement.rot === 90 || placement.rot === 270;
-    const width = rotated ? item.depth : item.width;
-    const depth = rotated ? item.width : item.depth;
+    // Rugs, tabletop, wall and ceiling items never block walking.
+    if (!occupiesFloor(placement)) return false;
+    const { width, depth } = footprint(placement);
     const centerX = placement.x - room.width / 2;
     const centerZ = placement.y - room.length / 2;
     return (
@@ -89,40 +87,8 @@ function findSpawn(room: Room, placements: Placement[]) {
   return { x, z };
 }
 
-function openingTransform(opening: Opening, room: Room) {
-  const inset = WALL_THICKNESS / 2 + 0.005;
-  switch (opening.wall) {
-    case "N":
-      return {
-        x: opening.offset - room.width / 2,
-        z: -room.length / 2 + inset,
-        rotY: 0,
-      };
-    case "S":
-      return {
-        x: opening.offset - room.width / 2,
-        z: room.length / 2 - inset,
-        rotY: 0,
-      };
-    case "W":
-      return {
-        x: -room.width / 2 + inset,
-        z: opening.offset - room.length / 2,
-        rotY: Math.PI / 2,
-      };
-    case "E":
-      return {
-        x: room.width / 2 - inset,
-        z: opening.offset - room.length / 2,
-        rotY: Math.PI / 2,
-      };
-  }
-}
-
 function RoomShell({ room }: { room: Room }) {
   const wallThickness = WALL_THICKNESS;
-  const doorHeight = Math.min(2.05, room.height - 0.1);
-  const windowHeight = Math.min(1.2, room.height - 1.2);
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -133,36 +99,7 @@ function RoomShell({ room }: { room: Room }) {
         <planeGeometry args={[room.width, room.length]} />
         <meshStandardMaterial color="#f7f6f2" />
       </mesh>
-      {room.doors.map((door) => {
-        const t = openingTransform(door, room);
-        return (
-          <mesh
-            key={door.id}
-            position={[t.x, doorHeight / 2, t.z]}
-            rotation={[0, t.rotY, 0]}
-          >
-            <boxGeometry args={[door.width, doorHeight, 0.02]} />
-            <meshStandardMaterial color="#9a7650" />
-          </mesh>
-        );
-      })}
-      {room.windows.map((win) => {
-        const t = openingTransform(win, room);
-        return (
-          <mesh
-            key={win.id}
-            position={[t.x, 0.9 + windowHeight / 2, t.z]}
-            rotation={[0, t.rotY, 0]}
-          >
-            <boxGeometry args={[win.width, windowHeight, 0.02]} />
-            <meshStandardMaterial
-              color="#cfe4f3"
-              emissive="#cfe4f3"
-              emissiveIntensity={0.35}
-            />
-          </mesh>
-        );
-      })}
+      <RoomOpenings room={room} inset={WALL_THICKNESS / 2} />
       <mesh position={[0, room.height / 2, room.length / 2]}>
         <boxGeometry args={[room.width, room.height, wallThickness]} />
         <WallMaterial room={room} span={room.width} />
@@ -193,7 +130,12 @@ function Furniture({
   return (
     <>
       {placements.map((placement) => (
-        <FurnitureModel key={placement.id} placement={placement} room={room} />
+        <FurnitureModel
+          key={placement.id}
+          placement={placement}
+          room={room}
+          elevation={elevationOf(placement, placements, room)}
+        />
       ))}
     </>
   );

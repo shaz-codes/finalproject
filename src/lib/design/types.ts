@@ -26,6 +26,20 @@ export interface Room {
 	windows: Opening[];
 }
 
+export type FurnitureCategory =
+	| "Sleep"
+	| "Living"
+	| "Work"
+	| "Dining"
+	| "Storage"
+	| "Lighting"
+	| "Electronics"
+	| "Decor"
+	| "Kitchen";
+
+/** floor: stands on the floor; surface: rests on a supporting item under it; wall: hangs flat against a wall; ceiling: hangs from the ceiling. */
+export type Mount = "floor" | "surface" | "wall" | "ceiling";
+
 export interface FurnitureCatalogItem {
 	id: string;
 	name: string;
@@ -33,10 +47,19 @@ export interface FurnitureCatalogItem {
 	depth: number; // Y extent (m)
 	height: number; // (m)
 	color: string;
-	/** GLB under /public, authored facing +Z; scaled to width/height/depth. */
+	category: FurnitureCategory;
+	style: "stylized" | "realistic";
+	mount?: Mount;
+	/** Surface items can be placed on top of this item. */
+	supports?: boolean;
+	/** Default height (m) of a wall item's base above the floor. */
+	wallHeight?: number;
+	/** glTF/GLB under /public, authored facing +Z; scaled to width/height/depth. */
 	model?: string;
-	/** Emits a point light from near the top of the item (lamps). */
-	light?: { color: string; intensity: number };
+	/** Extra yaw (degrees) applied to the model before fitting, for assets not authored facing +Z. */
+	modelYaw?: number;
+	/** Emits a point light; `material` names the glowing shade/bulb material in the model. */
+	light?: { color: string; intensity: number; material?: string };
 }
 
 export interface Placement {
@@ -45,4 +68,8 @@ export interface Placement {
 	x: number; // center, meters from west wall
 	y: number; // center, meters from north wall
 	rot: Rotation;
+	/** Manual base height above the floor (m); overrides the mount's automatic elevation. */
+	z?: number;
+	/** Uniform size multiplier applied to the catalog dimensions. */
+	scale?: number;
 }
