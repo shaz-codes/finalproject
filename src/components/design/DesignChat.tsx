@@ -10,6 +10,7 @@ export function DesignChat() {
 	const room = useDesignStore((state) => state.room);
 	const placements = useDesignStore((state) => state.placements);
 	const applyPlacements = useDesignStore((state) => state.applyPlacements);
+	const applyRoom = useDesignStore((state) => state.applyRoom);
 	const [message, setMessage] = useState("");
 	const [messages, setMessages] = useState<Message[]>([
 		{
@@ -42,6 +43,7 @@ export function DesignChat() {
 				...current,
 				{ role: "assistant", text: data.reply },
 			]);
+			if (data.room) applyRoom(data.room);
 			setOptions(data.options ?? []);
 		} catch (chatError) {
 			setError(

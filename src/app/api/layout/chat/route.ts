@@ -24,7 +24,80 @@ const CATALOG_ALIASES: Record<string, string[]> = {
 	sofa: ["sofa", "couch"],
 	"coffee-table": ["coffee table", "center table"],
 	bookshelf: ["bookshelf", "book shelf", "shelf"],
+	nightstand: ["nightstand", "bedside table", "side table"],
+	"dining-table": ["dining table", "dinner table"],
+	"dining-chair": ["dining chair"],
+	"tv-unit": ["tv unit", "television unit", "tv stand"],
+	"floor-lamp": ["floor lamp", "lamp"],
+	plant: ["plant", "indoor plant"],
+	rug: ["rug", "carpet"],
 };
+
+const COLORS: Record<string, string> = {
+	pink: "#e8a6b5",
+	blue: "#9fc5e8",
+	green: "#a8c59b",
+	yellow: "#ead58b",
+	white: "#f7f5ef",
+	black: "#242824",
+	grey: "#aeb5b0",
+	gray: "#aeb5b0",
+	beige: "#d8cdbb",
+	cream: "#f1e5c8",
+	terra: "#c87561",
+	purple: "#b9a4d0",
+};
+
+function roomFromRequest(room: Room, text: string): Room {
+	const lower = text.toLowerCase();
+	const pair = lower.match(
+		/(\d+(?:\.\d+)?)\s*(m|meter|metre|ft|feet)?\s*(?:x|by)\s*(\d+(?:\.\d+)?)/,
+	);
+	const convert = (value: string, unit?: string) =>
+		Number(value) * (/ft|feet/.test(unit ?? "") ? 0.3048 : 1);
+	let width = room.width;
+	let length = room.length;
+	if (pair) {
+		width = convert(pair[1], pair[2]);
+		length = convert(pair[3], pair[2]);
+	}
+	const widthMatch = lower.match(
+		/(?:width|wide)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*(m|meter|metre|ft|feet)?/,
+	);
+	const lengthMatch = lower.match(
+		/(?:length|long)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*(m|meter|metre|ft|feet)?/,
+	);
+	const heightMatch = lower.match(
+		/(?:height|ceiling)\s*(?:is|of|=)?\s*(\d+(?:\.\d+)?)\s*(m|meter|metre|ft|feet)?/,
+	);
+	if (widthMatch) width = convert(widthMatch[1], widthMatch[2]);
+	if (lengthMatch) length = convert(lengthMatch[1], lengthMatch[2]);
+	const color = Object.entries(COLORS).find(
+		([name]) =>
+			(lower.includes("wall") && lower.includes(name)) ||
+			lower.includes(`${name} wall`) ||
+			lower.includes(`${name} walls`),
+	)?.[1];
+	const floorColor = Object.entries(COLORS).find(
+		([name]) => lower.includes("floor") && lower.includes(name),
+	)?.[1];
+	return {
+		...room,
+		width: Math.max(2, Math.min(20, Number(width.toFixed(2)))),
+		length: Math.max(2, Math.min(20, Number(length.toFixed(2)))),
+		height: heightMatch
+			? Math.max(
+					2,
+					Math.min(
+						5,
+						Number(convert(heightMatch[1], heightMatch[2]).toFixed(2)),
+					),
+				)
+			: room.height,
+		wallColor: color ?? room.wallColor ?? "#e5e3da",
+		floorColor: floorColor ?? room.floorColor ?? "#d8cdbb",
+	};
+}
 
 function safePlacements(value: unknown): value is Placement[] {
 	return (
@@ -69,6 +142,7 @@ function addRequestedFurniture(
 	placements: Placement[],
 	message: string,
 ) {
+	room = roomFromRequest(room, message);
 	const requested = extractCatalogIds(message);
 	const additions = requested.map((catalogId, index) => {
 		const item = getCatalogItem(catalogId);
@@ -93,12 +167,18 @@ function localConversation(
 	const weights = weightsFromText(message);
 	const options = optimizeLayout(room, nextPlacements, weights);
 	const names = requested.map((id) => getCatalogItem(id).name);
+	const changes: string[] = [];
+	if (room.wallColor !== "#e5e3da") changes.push("the wall color");
+	if (room.floorColor !== "#d8cdbb") changes.push("the floor color");
+	if (room.width !== 4 || room.length !== 3.5 || room.height !== 2.7)
+		changes.push(`the ${room.width} x ${room.length} m room dimensions`);
 	const reply =
-		names.length > 0
-			? `I added ${names.join(", ")} and prepared ranked layouts. Choose one below, then apply it to the room.`
+		names.length > 0 || changes.length > 0
+			? `I updated ${[...changes, ...names.map((name) => name.toLowerCase())].join(", ")} and prepared ranked layouts. Choose one below, then apply it to the room.`
 			: "I reviewed the current furniture and prepared ranked layouts. Tell me what to add, remove, or prioritize, such as: 'add a sofa and keep more open space'.";
 	return {
 		reply,
+		room,
 		placements:
 			options[0]?.placements ?? relationFallback(room, nextPlacements),
 		options,
@@ -127,7 +207,7 @@ async function askModel(room: Room, placements: Placement[], message: string) {
 						{
 							role: "system",
 							content:
-								"You are a helpful interior design chatbot. Return JSON only with reply (short string), placements (complete array), and weights (ergonomics, space, vastu numbers). Use only catalog IDs from the supplied catalog. Preserve existing placement IDs unless the user asks to remove something. Coordinates are meters from the south-west corner and rotations are 0, 90, 180, or 270. Keep doors clear and explain the design reasoning in reply.",
+								"You are a helpful interior design chatbot. Return JSON only with reply (short string), room (complete room object), placements (complete array), and weights (ergonomics, space, vastu numbers). Apply explicit requests for width, length, ceiling height, wall colors, and floor colors. Use only catalog IDs from the supplied catalog. Preserve existing placement IDs unless the user asks to remove something. Coordinates are meters from the south-west room corner and rotations are 0, 90, 180, or 270. Keep doors clear and explain the design reasoning in reply.",
 						},
 						{
 							role: "user",
@@ -151,6 +231,7 @@ async function askModel(room: Room, placements: Placement[], message: string) {
 		try {
 			const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}");
 			if (
+				!isRoom(parsed.room) ||
 				!safePlacements(parsed.placements) ||
 				typeof parsed.reply !== "string"
 			)
@@ -159,9 +240,17 @@ async function askModel(room: Room, placements: Placement[], message: string) {
 				parsed.weights && typeof parsed.weights === "object"
 					? { ...DEFAULT_WEIGHTS, ...parsed.weights }
 					: DEFAULT_WEIGHTS;
-			const options = optimizeLayout(room, parsed.placements, weights);
+			const requestedRoom = {
+				...roomFromRequest(room, message),
+				wallColor:
+					parsed.room.wallColor ?? roomFromRequest(room, message).wallColor,
+				floorColor:
+					parsed.room.floorColor ?? roomFromRequest(room, message).floorColor,
+			};
+			const options = optimizeLayout(requestedRoom, parsed.placements, weights);
 			return {
 				reply: parsed.reply,
+				room: requestedRoom,
 				placements: options[0]?.placements ?? parsed.placements,
 				options,
 				source: "llm" as const,

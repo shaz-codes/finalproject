@@ -26,6 +26,8 @@ export function isRoom(v: unknown): v is Room {
 		isFiniteNumber(r.width) &&
 		isFiniteNumber(r.length) &&
 		isFiniteNumber(r.height) &&
+		(typeof r.wallColor === "undefined" || typeof r.wallColor === "string") &&
+		(typeof r.floorColor === "undefined" || typeof r.floorColor === "string") &&
 		Array.isArray(r.doors) &&
 		r.doors.every(isOpening) &&
 		Array.isArray(r.windows) &&

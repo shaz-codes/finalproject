@@ -553,6 +553,186 @@ a {
 	}
 }
 
+/* Walkthrough stage */
+.walkthrough-page {
+	padding-bottom: 8px;
+}
+.walkthrough-page-header {
+	padding: 5px 2px;
+}
+.walkthrough-page-title h1 {
+	font-size: clamp(26px, 4vw, 38px);
+}
+.walkthrough-room-meta {
+	padding: 8px 11px;
+	border: 1px solid var(--line);
+	border-radius: 20px;
+	background: rgba(255, 255, 255, 0.55);
+}
+.walkthrough-page > .walkthrough-viewer {
+	position: relative;
+	border: 7px solid #fff;
+	border-radius: 18px;
+	background: #b9c6bc;
+	box-shadow:
+		0 28px 80px rgba(36, 74, 56, 0.16),
+		0 3px 0 rgba(36, 74, 56, 0.06);
+}
+.walkthrough-page > .walkthrough-viewer::after {
+	position: absolute;
+	inset: 0;
+	border: 1px solid rgba(255, 255, 255, 0.32);
+	border-radius: 11px;
+	content: "";
+	pointer-events: none;
+}
+.walkthrough-start-screen {
+	padding: 30px;
+	background: linear-gradient(
+		135deg,
+		rgba(20, 42, 32, 0.84),
+		rgba(20, 42, 32, 0.42)
+	);
+}
+.start-card-mark {
+	display: grid;
+	width: 39px;
+	height: 39px;
+	place-items: center;
+	margin-bottom: 18px;
+	border: 1px solid rgba(255, 255, 255, 0.45);
+	border-radius: 50%;
+	font-family: var(--serif);
+	font-size: 22px;
+}
+.walkthrough-start-screen h3 {
+	font-size: clamp(32px, 5vw, 62px);
+	line-height: 0.98;
+}
+.walkthrough-start-stats {
+	display: flex;
+	justify-content: center;
+	margin-bottom: 22px;
+	border-top: 1px solid rgba(255, 255, 255, 0.22);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+.walkthrough-start-stats span {
+	display: grid;
+	gap: 3px;
+	min-width: 105px;
+	padding: 10px 14px;
+	border-right: 1px solid rgba(255, 255, 255, 0.16);
+}
+.walkthrough-start-stats span:last-child {
+	border-right: 0;
+}
+.walkthrough-start-stats strong {
+	font-size: 12px;
+	font-weight: 600;
+}
+.walkthrough-start-stats small {
+	color: rgba(255, 255, 255, 0.56);
+	font-size: 9px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.walkthrough-live-badge {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 7px 10px;
+	border: 1px solid rgba(255, 255, 255, 0.26);
+	border-radius: 20px;
+	background: rgba(24, 43, 35, 0.64);
+	backdrop-filter: blur(8px);
+	color: #fff;
+	font-size: 10px;
+	z-index: 2;
+}
+.live-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #9bd18e;
+	box-shadow: 0 0 0 3px rgba(155, 209, 142, 0.18);
+}
+.walkthrough-controls-card {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+	display: grid;
+	gap: 7px;
+	min-width: 142px;
+	padding: 11px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 10px;
+	background: rgba(24, 43, 35, 0.64);
+	backdrop-filter: blur(8px);
+	color: #fff;
+	z-index: 2;
+}
+.controls-card-label {
+	margin-bottom: 2px;
+	color: #c7dcc6;
+	font-size: 9px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+.key-row {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: rgba(255, 255, 255, 0.68);
+	font-size: 9px;
+}
+.key-row kbd {
+	display: inline-grid;
+	min-width: 19px;
+	height: 19px;
+	place-items: center;
+	padding: 0 4px;
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.1);
+	color: #fff;
+	font: inherit;
+	font-size: 9px;
+}
+.key-row kbd:first-child:last-of-type {
+	min-width: 39px;
+}
+
+@media (max-width: 600px) {
+	.walkthrough-page-header {
+		align-items: center;
+	}
+	.walkthrough-room-meta {
+		display: none;
+	}
+	.walkthrough-page > .walkthrough-viewer {
+		min-height: 68vh;
+		border-width: 4px;
+		border-radius: 12px;
+	}
+	.walkthrough-controls-card {
+		top: auto;
+		right: 10px;
+		bottom: 45px;
+		min-width: 125px;
+	}
+	.walkthrough-live-badge {
+		top: 10px;
+		left: 10px;
+	}
+	.walkthrough-start-stats span {
+		min-width: 0;
+		padding: 9px 7px;
+	}
+}
+
 .save-load-panel {
 	border: 1px solid var(--line);
 	border-radius: 12px;

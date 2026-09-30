@@ -8,6 +8,8 @@ const DEFAULT_ROOM: Room = {
 	width: 4,
 	length: 3.5,
 	height: 2.7,
+	wallColor: "#e5e3da",
+	floorColor: "#d8cdbb",
 	doors: [{ id: "door-1", wall: "S", offset: 1.5, width: 0.9 }],
 	windows: [{ id: "window-1", wall: "N", offset: 2, width: 1.2 }],
 };
@@ -19,7 +21,9 @@ interface DesignState {
 	placements: Placement[];
 	selectedId: string | null;
 	setRoomSize: (
-		dims: Partial<Pick<Room, "width" | "length" | "height">>,
+		dims: Partial<
+			Pick<Room, "width" | "length" | "height" | "wallColor" | "floorColor">
+		>,
 	) => void;
 	addOpening: (kind: "doors" | "windows", wall: Wall) => void;
 	removeOpening: (kind: "doors" | "windows", id: string) => void;
@@ -37,6 +41,7 @@ interface DesignState {
 		placements: Placement[];
 	}) => void;
 	applyPlacements: (placements: Placement[]) => void;
+	applyRoom: (room: Room) => void;
 	resetDesign: () => void;
 }
 
@@ -137,6 +142,8 @@ export const useDesignStore = create<DesignState>((set) => ({
 		set({ designId: id, designName: name, room, placements, selectedId: null }),
 
 	applyPlacements: (placements) => set({ placements, selectedId: null }),
+
+	applyRoom: (room) => set({ room }),
 
 	resetDesign: () =>
 		set({
